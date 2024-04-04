@@ -1,50 +1,78 @@
-Sub ExportDataToMainWorkbook()
-    Dim sourceWorkbook As Workbook
-    Dim targetWorkbook As Workbook
-    Dim targetSheet As Worksheet
-    Dim sourceSheet As Worksheet
-    Dim lastSourceRow As Long
-    Dim lastTargetRow As Long
+Sub HailsExportData()
+    On Error GoTo ErrorHandler
+    
+    Dim sourceWs As Worksheet, targetWs As Worksheet
+    Dim sourceWb As Workbook, targetWb As Workbook
+    Dim lastSourceRow As Long, lastTargetRow As Long, colCount As Long
+    Dim sourceRow As Long, targetRow As Long, col As Long
+    Dim cellMatch As Boolean, rowMatch As Boolean
+    Dim updatesMade As Boolean
 
-    Set sourceWorkbook = ThisWorkbook
-    
-    ' Adjust the path to the location of your main workbook
-    Dim mainWorkbookPath As String
-    mainWorkbookPath = "\\SERVER\PATH\TO\EXCEL\EXCEL-FILE.xlsm"
+    ' Setup workbooks and worksheets
+    Set sourceWb = ThisWorkbook
+    Set sourceWs = sourceWb.Sheets("Sheet1") ' Adjust your source sheet name
+    Set targetWb = Workbooks.Open("\\SERVER\PATH\TO\EXCEL.xlsm")
+    Set targetWs = targetWb.Sheets("Sheet1") ' Adjust your target sheet name
 
-    ' Open the main workbook
-    On Error Resume Next
-    Set targetWorkbook = Workbooks.Open(mainWorkbookPath)
-    If targetWorkbook Is Nothing Then
-        MsgBox "Failed to open the Database Excel File."
-        Exit Sub
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+
+    lastSourceRow = sourceWs.Cells(sourceWs.Rows.Count, "C").End(xlUp).Row
+    lastTargetRow = targetWs.Cells(targetWs.Rows.Count, "C").End(xlUp).Row
+    colCount = 13 ' Columns C to O (inclusive)
+
+    ' Check if there's data to process
+    If lastSourceRow < 4 Then
+        MsgBox "No new data was found, No changes were made to the Database", vbExclamation
+        GoTo CleanExit
     End If
-    On Error GoTo 0
-    
-    ' Assuming data to be copied is in Sheet1; adjust as necessary
-    Set sourceSheet = sourceWorkbook.Sheets("Sheet1")
-    Set targetSheet = targetWorkbook.Sheets("Sheet1")
-    
-    ' Find the last row with data in the source sheet
-    lastSourceRow = sourceSheet.Cells(sourceSheet.Rows.Count, "C").End(xlUp).Row
-    
-    ' Find the last row in the target sheet to append data
-    lastTargetRow = targetSheet.Cells(targetSheet.Rows.Count, "C").End(xlUp).Row + 1
-    
-    ' Check if there is data to copy
-    If lastSourceRow >= 4 Then
-        ' Copy data from source to target
-        sourceSheet.Range("C4:O" & lastSourceRow).Copy _
-            Destination:=targetSheet.Range("C" & lastTargetRow)
-    Else
-        MsgBox "No data to export."
-    End If
-    
-    ' Save and close the main workbook
-    targetWorkbook.Close SaveChanges:=True
-    
-    MsgBox "Data exported successfully."
+
+    For sourceRow = 4 To lastSourceRow
+        rowMatch = False
+        updatesMade = False
+
+        For targetRow = 4 To lastTargetRow
+            cellMatch = True ' Assume a match until proven otherwise
+
+            ' Check each column in the current row for a match
+            For col = 3 To colCount + 2 ' Adjust column indexes for C to O
+                If sourceWs.Cells(sourceRow, col).Value <> targetWs.Cells(targetRow, col).Value Then
+                    cellMatch = False ' Found a difference
+                    Exit For
+                End If
+            Next col
+
+            If cellMatch Then ' Full match, skip this row
+                rowMatch = True
+                Exit For
+            Else ' Check for partial match to update differences
+                For col = 3 To colCount + 2
+                    If sourceWs.Cells(sourceRow, col).Value <> targetWs.Cells(targetRow, col).Value Then
+                        ' Update only differing cells
+                        targetWs.Cells(targetRow, col).Value = sourceWs.Cells(sourceRow, col).Value
+                        updatesMade = True
+                    End If
+                Next col
+            End If
+
+            If updatesMade Then Exit For ' Exit after updating a partially matched row
+        Next targetRow
+
+        ' If no match at all, append the row
+        If Not rowMatch And Not updatesMade Then
+            lastTargetRow = lastTargetRow + 1
+            sourceWs.Rows(sourceRow).Copy Destination:=targetWs.Rows(lastTargetRow)
+        End If
+    Next sourceRow
+
+    targetWb.Close SaveChanges:=True
+
+CleanExit:
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+    Exit Sub
+
+ErrorHandler:
+    MsgBox "An error has occurred. Please Contact NAME HERE at NAME@EMAIL.COM", vbCritical
+    Resume CleanExit
 End Sub
-
-
-
