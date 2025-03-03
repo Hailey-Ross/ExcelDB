@@ -3,6 +3,6 @@ a set of VBA scripts for importing and exporting data from another Excel File ac
 
 
 
-Requires setup, will update the Readme with more info at a later date
+Provided as-is, requires setup, I *might* update the Readme with more info.
 
 ♥ Hails
